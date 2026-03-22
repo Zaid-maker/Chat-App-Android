@@ -5,8 +5,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import api from '@/constants/api';
+import api, { SOCKET_URL } from '@/constants/api';
 import storage from '@/constants/storage';
+import { io } from 'socket.io-client';
 
 export default function MessagesScreen() {
   const [chats, setChats] = useState<any[]>([]);
@@ -52,6 +53,28 @@ export default function MessagesScreen() {
     
     getInitialData();
   }, [fetchChats]);
+
+  useEffect(() => {
+    if (!currentUser?._id) return;
+
+    const socket = io(SOCKET_URL);
+
+    socket.on('connect', () => {
+      socket.emit('join', currentUser._id);
+    });
+
+    socket.on('message received', (message) => {
+      const participants = message?.chat?.participants || [];
+      const isMyChat = participants.some((participant: any) => participant?._id === currentUser._id);
+      if (isMyChat) {
+        fetchChats(false);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentUser?._id, fetchChats]);
 
   const onRefresh = () => {
     setRefreshing(true);
