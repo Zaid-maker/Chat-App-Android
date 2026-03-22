@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth.routes.js";
 import chatRoutes from "./routes/chat.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import callRoutes from "./routes/call.routes.js";
+import User from "./models/user.model.js";
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.set("trust proxy", 1);
 const io = new Server(server, {
     cors: corsOptions,
 });
+const activeSocketsByUserId = new Map();
 
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -114,6 +116,16 @@ io.on("connection", (socket) => {
     socket.on("join", (userId) => {
         socket.join(userId);
         socket.data.userId = userId;
+        const currentCount = activeSocketsByUserId.get(userId) || 0;
+        activeSocketsByUserId.set(userId, currentCount + 1);
+
+        User.findByIdAndUpdate(userId, {
+            isOnline: true,
+            lastSeen: new Date(),
+        }).catch((error) => {
+            console.error(`❌ PRESENCE: Failed to mark user online (${userId}):`, error.message);
+        });
+
         console.log(`✅ SOCKET: User ${userId} joined their room`);
     });
 
@@ -163,6 +175,24 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", (reason) => {
+        const disconnectedUserId = socket.data.userId;
+        if (disconnectedUserId) {
+            const currentCount = activeSocketsByUserId.get(disconnectedUserId) || 0;
+            const nextCount = Math.max(0, currentCount - 1);
+
+            if (nextCount === 0) {
+                activeSocketsByUserId.delete(disconnectedUserId);
+                User.findByIdAndUpdate(disconnectedUserId, {
+                    isOnline: false,
+                    lastSeen: new Date(),
+                }).catch((error) => {
+                    console.error(`❌ PRESENCE: Failed to mark user offline (${disconnectedUserId}):`, error.message);
+                });
+            } else {
+                activeSocketsByUserId.set(disconnectedUserId, nextCount);
+            }
+        }
+
         console.log(`🛑 SOCKET: Client disconnected | id=${socket.id} reason=${reason}`);
     });
 

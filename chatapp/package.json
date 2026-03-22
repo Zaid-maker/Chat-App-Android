@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "scripts": {
     "start": "bunx expo start",
-    "start:dev-client": "bunx expo start --dev-client",
+    "start:tunnel": "bunx expo start --tunnel",
+    "start:lan": "bunx expo start --lan",
+    "start:dev-client": "bunx expo start --dev-client --lan",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "bunx expo run:android",
     "ios": "bunx expo run:ios",

@@ -6,6 +6,11 @@ const PORT = '5000';
 const FALLBACK_SERVER_IP = '192.168.100.204';
 const PRODUCTION_SERVER_URL = 'https://chat-app-android.onrender.com';
 
+const isPrivateIPv4 = (host: string): boolean => {
+    // Accept LAN/private ranges only for local backend auto-detection.
+    return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(host);
+};
+
 const parseHost = (value?: string | null): string | null => {
     if (!value) return null;
 
@@ -19,7 +24,11 @@ const parseHost = (value?: string | null): string | null => {
 
 const getExpoHost = (): string | null => {
     const hostUri = Constants.expoConfig?.hostUri;
-    return parseHost(hostUri);
+    const host = parseHost(hostUri);
+    if (!host || !isPrivateIPv4(host)) {
+        return null;
+    }
+    return host;
 };
 
 const getMetroHost = (): string | null => {
@@ -37,6 +46,10 @@ const getMetroHost = (): string | null => {
         // Android emulator cannot reach localhost on host machine directly.
         if (hostname === 'localhost' && Platform.OS === 'android') {
             return '10.0.2.2';
+        }
+
+        if (!isPrivateIPv4(hostname) && hostname !== '10.0.2.2') {
+            return null;
         }
 
         return hostname;

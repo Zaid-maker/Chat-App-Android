@@ -30,7 +30,37 @@ export default function ChatRoomScreen() {
   useEffect(() => {
     const setup = async () => {
       const userData = await storage.getItem('userData');
-      if (userData) setCurrentUser(JSON.parse(userData));
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        setCurrentUser(parsedUser);
+
+        // Socket.io setup: join user room so server can deliver direct message events.
+        console.log('🔌 SOCKET: Attempting to connect to:', SOCKET_URL);
+        const newSocket = io(SOCKET_URL);
+        setSocket(newSocket);
+
+        newSocket.on('connect', () => {
+          if (parsedUser?._id) {
+            newSocket.emit('join', parsedUser._id);
+          }
+        });
+
+        newSocket.on('message received', (newMessage) => {
+          if (String(newMessage?.chat?._id) === String(id)) {
+            setMessages((prev) => {
+              if (!newMessage?._id) return prev;
+              if (prev.some((message) => message?._id === newMessage._id)) {
+                return prev;
+              }
+              return [...prev, newMessage];
+            });
+          }
+        });
+
+        newSocket.on('connect_error', (error) => {
+          console.error('SOCKET connect_error in chat room:', error.message);
+        });
+      }
 
       // Fetch messages
       try {
@@ -45,25 +75,11 @@ export default function ChatRoomScreen() {
 
     setup();
 
-    // Socket.io setup
-    console.log('🔌 SOCKET: Attempting to connect to:', SOCKET_URL);
-    const newSocket = io(SOCKET_URL, {
-      transports: ['websocket'],
-    });
-    
-    setSocket(newSocket);
-
-    newSocket.emit('join', id);
-
-    newSocket.on('message received', (newMessage) => {
-      console.log('📩 SOCKET: Received message via socket');
-      if (newMessage.chat._id === id) {
-        setMessages(prev => [...prev, newMessage]);
-      }
-    });
-
     return () => {
-      newSocket.disconnect();
+      setSocket((prevSocket: any) => {
+        prevSocket?.disconnect();
+        return null;
+      });
     };
   }, [id]);
 
@@ -88,7 +104,7 @@ export default function ChatRoomScreen() {
         });
 
         const newMessage = response.data;
-        setMessages([...messages, newMessage]);
+        setMessages((prev) => [...prev, newMessage]);
 
         if (socket) {
           socket.emit('new message', newMessage);
@@ -301,7 +317,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   messageList: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 20,
   },
   dateDivider: {
@@ -317,6 +333,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 16,
     alignItems: 'flex-end',
+    paddingHorizontal: 4,
   },
   userMessageRow: {
     justifyContent: 'flex-end',
@@ -335,7 +352,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    maxWidth: '80%',
+    maxWidth: '86%',
   },
   userBubble: {
     borderBottomRightRadius: 4,
