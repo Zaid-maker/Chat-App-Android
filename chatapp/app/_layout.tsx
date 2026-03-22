@@ -81,6 +81,7 @@ export default function RootLayout() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="new-chat" options={{ headerShown: false }} />
         <Stack.Screen name="profile/edit" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="dialer" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
