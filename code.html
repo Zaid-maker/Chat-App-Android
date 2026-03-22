@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>New Chat - Messenger</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec5b13",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#221610",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<div class="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-background-light dark:bg-background-dark shadow-2xl overflow-hidden">
+<header class="sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md px-4 pt-6 pb-2">
+<div class="flex items-center justify-between mb-4">
+<button class="flex h-10 w-10 items-center justify-center rounded-full hover:bg-primary/10 transition-colors">
+<span class="material-symbols-outlined text-slate-900 dark:text-slate-100">arrow_back</span>
+</button>
+<h2 class="text-xl font-bold flex-1 px-2">New Chat</h2>
+<button class="bg-primary text-white px-4 py-2 rounded-full font-semibold text-sm hover:opacity-90 transition-opacity">
+                    Create
+                </button>
+</div>
+<div class="px-0 py-2">
+<label class="flex flex-col w-full h-12">
+<div class="flex w-full flex-1 items-stretch rounded-xl bg-slate-200/50 dark:bg-slate-800/50 border border-slate-300 dark:border-slate-700">
+<div class="flex items-center justify-center pl-4 text-slate-500">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="w-full bg-transparent border-none focus:ring-0 px-3 text-base placeholder:text-slate-500" placeholder="Search contacts..." type="text"/>
+</div>
+</label>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto px-4 pb-32">
+<div class="mt-4 space-y-1">
+<button class="flex items-center w-full gap-4 p-3 rounded-xl hover:bg-primary/5 transition-colors group">
+<div class="flex items-center justify-center rounded-full bg-primary/10 text-primary shrink-0 size-12">
+<span class="material-symbols-outlined">group_add</span>
+</div>
+<div class="flex flex-1 flex-col items-start">
+<p class="text-base font-semibold">New Group</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Chat with multiple people</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 group-hover:translate-x-1 transition-transform">chevron_right</span>
+</button>
+<button class="flex items-center w-full gap-4 p-3 rounded-xl hover:bg-primary/5 transition-colors group">
+<div class="flex items-center justify-center rounded-full bg-primary/10 text-primary shrink-0 size-12">
+<span class="material-symbols-outlined">person_add</span>
+</div>
+<div class="flex flex-1 flex-col items-start">
+<p class="text-base font-semibold">New Contact</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Add a person by phone or ID</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 group-hover:translate-x-1 transition-transform">chevron_right</span>
+</button>
+</div>
+<div class="mt-8 mb-4">
+<p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 px-3">Contacts</p>
+</div>
+<div class="space-y-2">
+<label class="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer group">
+<div class="relative">
+<img alt="" class="size-12 rounded-full object-cover border-2 border-transparent group-hover:border-primary/50 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBU3CaF9os7bQ6eu8fSinlPtXAug3Quj0ETVhrbACK5W3sq2L4fwhEtAOwKFpcV4HsEOb-GMNg4NKQJPQP-jeJu_JapQhZJRlZMkvdqIuKCua8d7Aznd_P5NsktoT6kU84_2zK6UW7-Z9IxCUvgSY1Z0KabBYk6dVDpUmjO5wqgK_DMoHpqtMcs5dGaQHemp65pjXnu87SRA5mVk36D4OP_qmkX8065RDrJdpYgO3DxhTngNo0Oaco8ka6zK2fdQTY4FVj-YVh1xEeP"/>
+<div class="absolute bottom-0 right-0 size-3 bg-green-500 border-2 border-background-light dark:border-background-dark rounded-full"></div>
+</div>
+<div class="flex-1">
+<p class="text-base font-medium">Alex Thompson</p>
+<p class="text-xs text-slate-500">Available</p>
+</div>
+<div class="flex items-center">
+<input class="w-6 h-6 rounded-full border-slate-300 text-primary focus:ring-primary dark:bg-slate-800 dark:border-slate-700" type="checkbox"/>
+</div>
+</label>
+<label class="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer group">
+<div class="relative">
+<img alt="" class="size-12 rounded-full object-cover border-2 border-transparent group-hover:border-primary/50 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRRI6_b7va-bdHSJAirI877o_sJv6SWRNNhBmSkB1zwuVulZnpXiONMTiV69oBBp0OrlCZeM6uNKtqjz1wL3kFuDFt1WnzKIRiqDZQI9b3k0aUlLQPrM2k621tgf67rElSkK0dOXF5zbt1Bn0lotRqzwTofpuSJ0oeRXPf9Yvn5tO-Krc9iG2Ycaei9Uinw_dVHZx27oS-tduXOKf1zcwgq3u949RzrwsWbR_q3eCcvYcSwLKBNh0dTWKlCSo2tcvrJnQs-bCE2yZ_"/>
+<div class="absolute bottom-0 right-0 size-3 bg-slate-400 border-2 border-background-light dark:border-background-dark rounded-full"></div>
+</div>
+<div class="flex-1">
+<p class="text-base font-medium">Sarah Jenkins</p>
+<p class="text-xs text-slate-500">Away</p>
+</div>
+<div class="flex items-center">
+<input checked="" class="w-6 h-6 rounded-full border-slate-300 text-primary focus:ring-primary dark:bg-slate-800 dark:border-slate-700" type="checkbox"/>
+</div>
+</label>
+<label class="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer group">
+<div class="relative">
+<img alt="" class="size-12 rounded-full object-cover border-2 border-transparent group-hover:border-primary/50 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjj4DN7JsACUAHJAn3Z_PzQ9KVSprT72YwFoHPWvGWBgmp0lMXzJq25gktBj02RPl6K3s3_hKwOzkMw0wYDvwqUtjr2INqMumt-ersJsDXPZbUqsfs7byGMeiBzOjV0uwSbzE5adhhA-xbgbggpV422FLNqGJJKfg8OUj_j921QiTkeJX_kNSjLPZMLIpG0E-p5UrYNwae-1W0XOb0Zfb9F8_dTd3lH-OMnPl_MUrVVVBioAg6XHiUBXTJJscelcx5AbBPEk9mUfXF"/>
+</div>
+<div class="flex-1">
+<p class="text-base font-medium">David Chen</p>
+<p class="text-xs text-slate-500">At the gym</p>
+</div>
+<div class="flex items-center">
+<input class="w-6 h-6 rounded-full border-slate-300 text-primary focus:ring-primary dark:bg-slate-800 dark:border-slate-700" type="checkbox"/>
+</div>
+</label>
+<label class="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer group">
+<div class="relative">
+<img alt="" class="size-12 rounded-full object-cover border-2 border-transparent group-hover:border-primary/50 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrzq8GYyyatz80dcHZbr72ihjajfCW486vQF3SbCb7UZQySaCXJyXR11v986-8FlSYIQqQaAtJtA_uNR_5EI2vwUDeUtkKOO1MsrFEBVpphFzLlKVq1D8Kx-S1CQ__4vFJRaO0YiskUphGOd-d9RUQfGXepQVGy10kiRs-dIY54D31NpelUPhA85QmnnDnvBkrNygiQ6FZaq4NRYjANdxRyRfWOqxTj79QhYu_Pr6-nCeQdjYaPh3bg6NNuW-TXs9Az5O-Inw-qXil"/>
+<div class="absolute bottom-0 right-0 size-3 bg-green-500 border-2 border-background-light dark:border-background-dark rounded-full"></div>
+</div>
+<div class="flex-1">
+<p class="text-base font-medium">Emily Rodriguez</p>
+<p class="text-xs text-slate-500">Online</p>
+</div>
+<div class="flex items-center">
+<input class="w-6 h-6 rounded-full border-slate-300 text-primary focus:ring-primary dark:bg-slate-800 dark:border-slate-700" type="checkbox"/>
+</div>
+</label>
+<label class="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer group">
+<div class="relative">
+<div class="size-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-lg">MJ</div>
+</div>
+<div class="flex-1">
+<p class="text-base font-medium">Michael Jordan</p>
+<p class="text-xs text-slate-500">Busy</p>
+</div>
+<div class="flex items-center">
+<input class="w-6 h-6 rounded-full border-slate-300 text-primary focus:ring-primary dark:bg-slate-800 dark:border-slate-700" type="checkbox"/>
+</div>
+</label>
+</div>
+</main>
+<div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50">
+<div class="flex items-center justify-around bg-slate-900/90 dark:bg-slate-100/10 backdrop-blur-xl border border-white/10 px-4 py-3 rounded-full shadow-2xl">
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">chat_bubble</span>
+<span class="text-[10px] font-medium">Chats</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">contacts</span>
+<span class="text-[10px] font-medium">Contacts</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">call</span>
+<span class="text-[10px] font-medium">Calls</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-medium">Settings</span>
+</a>
+</div>
+</div>
+</div>
+</body></html>

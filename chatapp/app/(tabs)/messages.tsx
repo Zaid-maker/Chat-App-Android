@@ -153,7 +153,7 @@ export default function MessagesScreen() {
         activeOpacity={0.8}
         onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            // Navigate to contact list or search
+          router.push('/new-chat' as any);
         }}
       >
         <Ionicons name="add" size={32} color="#FFF" />
