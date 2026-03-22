@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   messageList: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 20,
   },
   dateDivider: {
@@ -327,6 +327,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 16,
     alignItems: 'flex-end',
+    paddingHorizontal: 4,
   },
   userMessageRow: {
     justifyContent: 'flex-end',
@@ -345,7 +346,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    maxWidth: '80%',
+    maxWidth: '86%',
   },
   userBubble: {
     borderBottomRightRadius: 4,
