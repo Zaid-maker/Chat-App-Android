@@ -76,6 +76,10 @@ export const sendMessage = async (req, res) => {
         return res.status(400).json({ message: "Invalid data passed into request" });
     }
 
+    if (typeof chatId !== "string" || !/^[0-9a-fA-F]{24}$/.test(chatId)) {
+        return res.status(400).json({ message: "Invalid chatId format" });
+    }
+
     const newMessage = {
         sender: req.user._id,
         content,
@@ -92,7 +96,7 @@ export const sendMessage = async (req, res) => {
             select: "username avatar email",
         });
 
-        await Chat.findByIdAndUpdate(req.body.chatId, { lastMessage: message });
+        await Chat.findByIdAndUpdate(chatId, { lastMessage: message });
 
         res.json(message);
     } catch (error) {
