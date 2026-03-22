@@ -44,6 +44,8 @@ const corsOptions = {
 
 const app = express();
 const server = http.createServer(app);
+// Render sits behind a reverse proxy, so trust the first proxy hop.
+app.set("trust proxy", 1);
 const io = new Server(server, {
     cors: corsOptions,
 });
