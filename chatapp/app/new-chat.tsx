@@ -4,6 +4,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Alert,
   SafeAreaView,
   Platform,
   StatusBar as RNStatusBar,
@@ -36,6 +37,8 @@ export default function NewChatScreen() {
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [contactsError, setContactsError] = useState<string | null>(null);
+  const [createChatError, setCreateChatError] = useState<string | null>(null);
 
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
@@ -43,6 +46,7 @@ export default function NewChatScreen() {
 
   const fetchContacts = useCallback(async () => {
     setLoading(true);
+    setContactsError(null);
     try {
       const token = await storage.getItem('userToken');
       if (!token) {
@@ -59,6 +63,7 @@ export default function NewChatScreen() {
       setContacts(response.data || []);
     } catch (error) {
       console.error('Error fetching contacts for new chat:', error);
+      setContactsError('Failed to load contacts. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -90,6 +95,7 @@ export default function NewChatScreen() {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCreating(true);
+    setCreateChatError(null);
 
     try {
       const token = await storage.getItem('userToken');
@@ -111,10 +117,21 @@ export default function NewChatScreen() {
       router.replace(`/chat/${response.data._id}`);
     } catch (error) {
       console.error('Error creating chat:', error);
+      setCreateChatError('Failed to start chat. Please try again.');
     } finally {
       setCreating(false);
     }
   }, [selectedContact, creating, router]);
+
+  const onPressNewGroup = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert('Coming soon', 'New Group will be available in a future update.');
+  }, []);
+
+  const onPressNewContact = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert('Coming soon', 'New Contact will be available in a future update.');
+  }, []);
 
   const renderContact = ({ item }: { item: Contact }) => {
     const selected = item._id === selectedUserId;
@@ -178,6 +195,8 @@ export default function NewChatScreen() {
           style={[styles.topIconButton, { backgroundColor: `${theme.slate200}55` }]}
           onPress={() => router.back()}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
         >
           <Ionicons name="arrow-back" size={22} color={theme.slate900} />
         </TouchableOpacity>
@@ -217,7 +236,13 @@ export default function NewChatScreen() {
       </View>
 
       <View style={styles.quickActions}>
-        <TouchableOpacity style={[styles.quickCard, { backgroundColor: `${theme.brandPrimary}14` }]} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[styles.quickCard, { backgroundColor: `${theme.brandPrimary}14` }]}
+          activeOpacity={0.85}
+          onPress={onPressNewGroup}
+          accessibilityRole="button"
+          accessibilityLabel="Create a new group"
+        >
           <View style={[styles.quickIcon, { backgroundColor: `${theme.brandPrimary}28` }]}>
             <Ionicons name="people" size={20} color={theme.brandPrimary} />
           </View>
@@ -228,7 +253,13 @@ export default function NewChatScreen() {
           <Ionicons name="chevron-forward" size={18} color={theme.slate400} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.quickCard, { backgroundColor: `${theme.brandPrimary}14` }]} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[styles.quickCard, { backgroundColor: `${theme.brandPrimary}14` }]}
+          activeOpacity={0.85}
+          onPress={onPressNewContact}
+          accessibilityRole="button"
+          accessibilityLabel="Create a new contact"
+        >
           <View style={[styles.quickIcon, { backgroundColor: `${theme.brandPrimary}28` }]}>
             <Ionicons name="person-add" size={20} color={theme.brandPrimary} />
           </View>
@@ -247,18 +278,41 @@ export default function NewChatScreen() {
           <ActivityIndicator size="large" color={theme.brandPrimary} />
         </View>
       ) : (
-        <FlatList
-          data={filteredContacts}
-          renderItem={renderContact}
-          keyExtractor={(item) => item._id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Text style={[styles.emptyText, { color: theme.slate500 }]}>No contacts found</Text>
+        <>
+          {createChatError ? (
+            <View style={[styles.errorBanner, { borderColor: '#fca5a5', backgroundColor: '#fee2e2' }]}>
+              <Text style={styles.errorBannerText}>{createChatError}</Text>
             </View>
-          }
-        />
+          ) : null}
+
+          <FlatList
+            data={filteredContacts}
+            renderItem={renderContact}
+            keyExtractor={(item) => item._id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              contactsError ? (
+                <View style={styles.emptyWrap}>
+                  <Text style={[styles.emptyText, { color: theme.slate500 }]}>{contactsError}</Text>
+                  <TouchableOpacity
+                    style={[styles.retryButton, { backgroundColor: theme.brandPrimary }]}
+                    onPress={fetchContacts}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry loading contacts"
+                  >
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.emptyWrap}>
+                  <Text style={[styles.emptyText, { color: theme.slate500 }]}>No contacts found</Text>
+                </View>
+              )
+            }
+          />
+        </>
       )}
     </SafeAreaView>
   );
@@ -421,6 +475,32 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
+    fontWeight: '600',
+  },
+  retryButton: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  errorBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  errorBannerText: {
+    color: '#991b1b',
+    fontSize: 13,
     fontWeight: '600',
   },
 });
