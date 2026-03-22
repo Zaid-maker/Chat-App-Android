@@ -13,6 +13,7 @@ export default function MessagesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState<Record<string, boolean>>({});
   
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
@@ -64,9 +65,23 @@ export default function MessagesScreen() {
   };
 
   const getChatAvatar = (chat: any) => {
-    if (chat.isGroup) return 'https://via.placeholder.com/60'; // Group placeholder
+    if (chat.isGroup) return '';
     const otherParticipant = chat.participants.find((p: any) => p._id !== currentUser?._id);
-    return otherParticipant?.avatar || 'https://via.placeholder.com/60';
+    return otherParticipant?.avatar || '';
+  };
+
+  const getOtherParticipant = (chat: any) => {
+    if (chat.isGroup) return null;
+    return chat.participants.find((p: any) => p._id !== currentUser?._id);
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || '?';
   };
 
   const formatTime = (dateString: string) => {
@@ -75,35 +90,68 @@ export default function MessagesScreen() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const renderChatItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={[styles.chatItem, { borderBottomColor: theme.slate200 }]}
-      activeOpacity={0.7}
-      onPress={() => router.push(`/chat/${item._id}`)}
-    >
-      <View style={styles.avatarContainer}>
-        <Image source={{ uri: getChatAvatar(item) }} style={styles.avatar} />
-        {/* Simplified online indicator for now */}
-        <View style={[styles.onlineIndicator, { borderColor: theme.background, backgroundColor: '#10b981' }]} />
-      </View>
-      <View style={styles.chatInfo}>
-        <View style={styles.chatHeader}>
-          <Text style={[styles.name, { color: theme.slate900 }]} numberOfLines={1}>
-            {getChatName(item)}
-          </Text>
-          <Text style={[styles.time, { color: theme.slate400 }]}>
-            {formatTime(item.updatedAt)}
-          </Text>
+  const renderChatItem = ({ item }: { item: any }) => {
+    const otherParticipant = getOtherParticipant(item);
+    const avatarUri = getChatAvatar(item);
+    const avatarKey = `chat-${item._id}`;
+    const shouldFallbackAvatar = !avatarUri || avatarLoadFailed[avatarKey];
+    const displayName = getChatName(item);
+    const isOnline = Boolean(otherParticipant?.isOnline);
+
+    return (
+      <TouchableOpacity 
+        style={[styles.chatItem, { borderBottomColor: theme.slate200 }]}
+        activeOpacity={0.7}
+        onPress={() => router.push(`/chat/${item._id}`)}
+      >
+        <View style={styles.avatarContainer}>
+          {shouldFallbackAvatar ? (
+            <View style={[styles.avatarFallback, { backgroundColor: theme.slate200 }]}> 
+              <Text style={[styles.avatarFallbackText, { color: theme.slate500 }]}>{getInitials(displayName)}</Text>
+            </View>
+          ) : (
+            <Image
+              source={{ uri: avatarUri }}
+              style={styles.avatar}
+              onError={() =>
+                setAvatarLoadFailed((prev) => ({
+                  ...prev,
+                  [avatarKey]: true,
+                }))
+              }
+            />
+          )}
+          {otherParticipant ? (
+            <View
+              style={[
+                styles.onlineIndicator,
+                {
+                  borderColor: theme.background,
+                  backgroundColor: isOnline ? '#10b981' : theme.slate400,
+                },
+              ]}
+            />
+          ) : null}
         </View>
-        <View style={styles.chatFooter}>
-          <Text style={[styles.message, { color: theme.slate500 }]} numberOfLines={1}>
-            {item.lastMessage?.content || 'No messages yet'}
-          </Text>
-          {/* Unread badge logic would go here */}
+        <View style={styles.chatInfo}>
+          <View style={styles.chatHeader}>
+            <Text style={[styles.name, { color: theme.slate900 }]} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <Text style={[styles.time, { color: theme.slate400 }]}> 
+              {formatTime(item.updatedAt)}
+            </Text>
+          </View>
+          <View style={styles.chatFooter}>
+            <Text style={[styles.message, { color: theme.slate500 }]} numberOfLines={1}>
+              {item.lastMessage?.content || 'No messages yet'}
+            </Text>
+            {/* Unread badge logic would go here */}
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.brandBackground }]}>
@@ -219,6 +267,17 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     backgroundColor: '#eee',
+  },
+  avatarFallback: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 16,
+    fontWeight: '800',
   },
   onlineIndicator: {
     position: 'absolute',

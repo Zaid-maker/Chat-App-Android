@@ -51,6 +51,7 @@ export default function ContactsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [openingChatFor, setOpeningChatFor] = useState<string | null>(null);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState<Record<string, boolean>>({});
 
   const [contactsPermission, setContactsPermission] = useState<ExpoContacts.PermissionStatus | null>(null);
   const [deviceContactsCount, setDeviceContactsCount] = useState(0);
@@ -214,6 +215,15 @@ export default function ContactsScreen() {
     requestDeviceContactsPermission();
   };
 
+  const getInitials = useCallback((name: string) => {
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || '?';
+  }, []);
+
   const openOrCreateChat = async (contact: Contact) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setOpeningChatFor(contact._id);
@@ -310,6 +320,9 @@ export default function ContactsScreen() {
           renderItem={({ item, section }) => {
             if (section.key === 'phoneMatches') {
               const matched = item as DeviceContactMatch;
+              const avatarKey = `phone-${matched.matchedUser._id}`;
+              const shouldFallbackAvatar = !matched.matchedUser.avatar || avatarLoadFailed[avatarKey];
+
               return (
                 <TouchableOpacity
                   style={[styles.contactItem, { borderBottomColor: theme.slate200 }]}
@@ -317,8 +330,25 @@ export default function ContactsScreen() {
                   onPress={() => openOrCreateChat(matched.matchedUser)}
                 >
                   <View style={styles.avatarContainer}>
-                    <Image source={{ uri: matched.matchedUser.avatar || 'https://via.placeholder.com/52' }} style={styles.avatar} />
-                    <View style={[styles.onlineIndicator, { borderColor: theme.background }]} />
+                    {shouldFallbackAvatar ? (
+                      <View style={[styles.avatarFallback, { backgroundColor: theme.slate200 }]}> 
+                        <Text style={[styles.avatarFallbackText, { color: theme.slate500 }]}>{getInitials(matched.name)}</Text>
+                      </View>
+                    ) : (
+                      <Image
+                        source={{ uri: matched.matchedUser.avatar }}
+                        style={styles.avatar}
+                        onError={() =>
+                          setAvatarLoadFailed((prev) => ({
+                            ...prev,
+                            [avatarKey]: true,
+                          }))
+                        }
+                      />
+                    )}
+                    {matched.matchedUser.isOnline ? (
+                      <View style={[styles.onlineIndicator, { borderColor: theme.background }]} />
+                    ) : null}
                   </View>
                   <View style={styles.contactInfo}>
                     <Text style={[styles.name, { color: theme.slate900 }]}>{matched.name}</Text>
@@ -332,6 +362,9 @@ export default function ContactsScreen() {
             }
 
             const contact = item as Contact;
+            const avatarKey = `app-${contact._id}`;
+            const shouldFallbackAvatar = !contact.avatar || avatarLoadFailed[avatarKey];
+
             return (
               <TouchableOpacity
                 style={[styles.contactItem, { borderBottomColor: theme.slate200 }]}
@@ -339,7 +372,22 @@ export default function ContactsScreen() {
                 onPress={() => openOrCreateChat(contact)}
               >
                 <View style={styles.avatarContainer}>
-                  <Image source={{ uri: contact.avatar || 'https://via.placeholder.com/52' }} style={styles.avatar} />
+                  {shouldFallbackAvatar ? (
+                    <View style={[styles.avatarFallback, { backgroundColor: theme.slate200 }]}> 
+                      <Text style={[styles.avatarFallbackText, { color: theme.slate500 }]}>{getInitials(contact.username)}</Text>
+                    </View>
+                  ) : (
+                    <Image
+                      source={{ uri: contact.avatar }}
+                      style={styles.avatar}
+                      onError={() =>
+                        setAvatarLoadFailed((prev) => ({
+                          ...prev,
+                          [avatarKey]: true,
+                        }))
+                      }
+                    />
+                  )}
                   {contact.isOnline && <View style={[styles.onlineIndicator, { borderColor: theme.background }]} />}
                 </View>
                 <View style={styles.contactInfo}>
@@ -494,6 +542,17 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
+  },
+  avatarFallback: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   onlineIndicator: {
     position: 'absolute',
