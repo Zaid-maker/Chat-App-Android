@@ -47,7 +47,13 @@ export default function ChatRoomScreen() {
 
         newSocket.on('message received', (newMessage) => {
           if (String(newMessage?.chat?._id) === String(id)) {
-            setMessages((prev) => [...prev, newMessage]);
+            setMessages((prev) => {
+              if (!newMessage?._id) return prev;
+              if (prev.some((message) => message?._id === newMessage._id)) {
+                return prev;
+              }
+              return [...prev, newMessage];
+            });
           }
         });
 
