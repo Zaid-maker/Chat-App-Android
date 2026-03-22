@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   messageList: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
     paddingVertical: 20,
   },
   dateDivider: {
@@ -333,7 +333,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 16,
     alignItems: 'flex-end',
-    paddingHorizontal: 4,
   },
   userMessageRow: {
     justifyContent: 'flex-end',
