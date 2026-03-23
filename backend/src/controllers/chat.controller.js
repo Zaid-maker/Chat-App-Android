@@ -125,7 +125,7 @@ export const toggleMessageReaction = async (req, res) => {
         }
 
         const isParticipant = message.chat?.participants?.some(
-            (participantId) => String(participantId) === String(req.user._id)
+            (participant) => String(participant?._id || participant) === String(req.user._id)
         );
 
         if (!isParticipant) {
@@ -156,7 +156,13 @@ export const toggleMessageReaction = async (req, res) => {
 
         const updatedMessage = await Message.findById(messageId)
             .populate("sender", "username avatar email")
-            .populate("chat")
+            .populate({
+                path: "chat",
+                populate: {
+                    path: "participants",
+                    select: "_id username avatar",
+                },
+            })
             .populate("reactions.user", "_id username avatar");
 
         res.json(updatedMessage);

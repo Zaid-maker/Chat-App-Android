@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, ScrollView, StatusBar as RNStatusBar, ActivityIndicator, Keyboard } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, ScrollView, StatusBar as RNStatusBar, ActivityIndicator, Keyboard, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -303,25 +303,34 @@ export default function ChatRoomScreen() {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={theme.brandPrimary} />
-          </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={item => item._id}
-            contentContainerStyle={styles.messageList}
-            showsVerticalScrollIndicator={false}
-            ListHeaderComponent={() => (
-              <View style={styles.dateDivider}>
-                <Text style={[styles.dateText, { color: theme.slate400 }]}>TODAY</Text>
-              </View>
-            )}
-          />
-        )}
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => {
+            if (reactionPickerForMessageId) {
+              setReactionPickerForMessageId(null);
+            }
+          }}
+        >
+          {loading ? (
+            <View style={styles.centerContainer}>
+              <ActivityIndicator size="large" color={theme.brandPrimary} />
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderMessage}
+              keyExtractor={item => item._id}
+              contentContainerStyle={styles.messageList}
+              showsVerticalScrollIndicator={false}
+              ListHeaderComponent={() => (
+                <View style={styles.dateDivider}>
+                  <Text style={[styles.dateText, { color: theme.slate400 }]}>TODAY</Text>
+                </View>
+              )}
+            />
+          )}
+        </Pressable>
 
         {/* Input Area */}
         <View style={[
