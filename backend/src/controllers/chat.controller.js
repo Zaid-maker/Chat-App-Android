@@ -103,3 +103,64 @@ export const sendMessage = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+// Toggle reaction for a message (one active reaction per user per message)
+export const toggleMessageReaction = async (req, res) => {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+
+    if (!emoji || typeof emoji !== "string") {
+        return res.status(400).json({ message: "Emoji is required" });
+    }
+
+    if (!messageId || !/^[0-9a-fA-F]{24}$/.test(messageId)) {
+        return res.status(400).json({ message: "Invalid messageId format" });
+    }
+
+    try {
+        const message = await Message.findById(messageId).populate("chat", "participants");
+
+        if (!message) {
+            return res.status(404).json({ message: "Message not found" });
+        }
+
+        const isParticipant = message.chat?.participants?.some(
+            (participantId) => String(participantId) === String(req.user._id)
+        );
+
+        if (!isParticipant) {
+            return res.status(403).json({ message: "Not allowed to react to this message" });
+        }
+
+        const existingIndex = message.reactions.findIndex(
+            (reaction) => String(reaction.user) === String(req.user._id)
+        );
+
+        if (existingIndex >= 0) {
+            const existingReaction = message.reactions[existingIndex];
+            if (existingReaction.emoji === emoji) {
+                // Toggle off same reaction
+                message.reactions.splice(existingIndex, 1);
+            } else {
+                // Replace reaction with a new emoji
+                message.reactions[existingIndex].emoji = emoji;
+            }
+        } else {
+            message.reactions.push({
+                user: req.user._id,
+                emoji,
+            });
+        }
+
+        await message.save();
+
+        const updatedMessage = await Message.findById(messageId)
+            .populate("sender", "username avatar email")
+            .populate("chat")
+            .populate("reactions.user", "_id username avatar");
+
+        res.json(updatedMessage);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

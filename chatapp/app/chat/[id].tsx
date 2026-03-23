@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, ScrollView, StatusBar as RNStatusBar, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, ScrollView, StatusBar as RNStatusBar, ActivityIndicator, Keyboard } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -10,6 +10,9 @@ import * as Haptics from 'expo-haptics';
 import api, { SOCKET_URL } from '@/constants/api';
 import storage from '@/constants/storage';
 import { io } from 'socket.io-client';
+import EmojiPicker from 'rn-emoji-keyboard';
+
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
 export default function ChatRoomScreen() {
   const insets = useSafeAreaInsets();
@@ -20,6 +23,8 @@ export default function ChatRoomScreen() {
 
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [reactionPickerForMessageId, setReactionPickerForMessageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [chatInfo, setChatInfo] = useState<any>(null);
@@ -55,6 +60,18 @@ export default function ChatRoomScreen() {
               return [...prev, newMessage];
             });
           }
+        });
+
+        newSocket.on('message reaction received', (updatedMessage) => {
+          if (!updatedMessage?._id) return;
+
+          setMessages((prev) =>
+            prev.map((message) =>
+              message._id === updatedMessage._id
+                ? { ...message, reactions: updatedMessage.reactions || [] }
+                : message
+            )
+          );
         });
 
         newSocket.on('connect_error', (error) => {
@@ -95,6 +112,7 @@ export default function ChatRoomScreen() {
     if (inputText.trim()) {
       const content = inputText.trim();
       setInputText('');
+      setShowEmojiPicker(false);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       try {
@@ -115,6 +133,66 @@ export default function ChatRoomScreen() {
     }
   };
 
+  const handleToggleEmojiPicker = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Keyboard.dismiss();
+    setShowEmojiPicker((prev) => !prev);
+  };
+
+  const handlePickEmoji = (emojiObject: { emoji: string }) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setInputText((prev) => `${prev}${emojiObject.emoji}`);
+    setShowEmojiPicker(false);
+  };
+
+  const handleReactToMessage = async (messageId: string, emoji: string) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const response = await api.patch(`/chats/messages/${messageId}/reactions`, { emoji });
+      const updatedMessage = response.data;
+
+      setMessages((prev) =>
+        prev.map((message) =>
+          message._id === updatedMessage._id
+            ? { ...message, reactions: updatedMessage.reactions || [] }
+            : message
+        )
+      );
+
+      if (socket) {
+        socket.emit('message reaction', updatedMessage);
+      }
+    } catch (error) {
+      console.error('Error reacting to message:', error);
+    } finally {
+      setReactionPickerForMessageId(null);
+    }
+  };
+
+  const renderReactions = (reactions: Array<{ emoji: string }> | undefined) => {
+    if (!reactions || reactions.length === 0) return null;
+
+    const grouped = reactions.reduce((acc: Record<string, number>, reaction) => {
+      if (!reaction?.emoji) return acc;
+      acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
+      return acc;
+    }, {});
+
+    const entries = Object.entries(grouped);
+    if (entries.length === 0) return null;
+
+    return (
+      <View style={styles.reactionsRow}>
+        {entries.map(([emoji, count]) => (
+          <View key={emoji} style={[styles.reactionChip, { backgroundColor: theme.slate200 + '55' }]}>
+            <Text style={styles.reactionEmoji}>{emoji}</Text>
+            <Text style={[styles.reactionCount, { color: theme.slate500 }]}>{count}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   const getOtherParticipant = () => {
     if (!chatInfo || !currentUser) return null;
     return chatInfo.participants.find((p: any) => p._id !== currentUser._id);
@@ -122,7 +200,16 @@ export default function ChatRoomScreen() {
 
   const renderMessage = ({ item }: { item: any }) => {
     const isUser = item.sender._id === currentUser?._id;
+    const showReactionPicker = reactionPickerForMessageId === item._id;
+
     return (
+      <TouchableOpacity
+        activeOpacity={0.95}
+        onLongPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setReactionPickerForMessageId(item._id);
+        }}
+      >
       <View style={[
         styles.messageRow,
         isUser ? styles.userMessageRow : styles.friendMessageRow
@@ -130,24 +217,44 @@ export default function ChatRoomScreen() {
         {!isUser && (
           <Image source={{ uri: item.sender.avatar || 'https://via.placeholder.com/28' }} style={styles.messageAvatar} />
         )}
-        <View style={[
-          styles.bubble,
-          isUser ?
-            [styles.userBubble, { backgroundColor: theme.userBubble }] :
-            [styles.friendBubble, { backgroundColor: theme.friendBubble }]
-        ]}>
-          <Text style={[
-            styles.messageText,
-            { color: isUser ? '#FFF' : theme.slate900 }
-          ]}>{item.content}</Text>
-          <Text style={[
-            styles.messageTime,
-            { color: isUser ? 'rgba(255,255,255,0.7)' : theme.slate500 }
+        <View style={styles.messageContentWrap}>
+          {showReactionPicker ? (
+            <View style={[styles.reactionPickerRow, { backgroundColor: theme.background, borderColor: theme.slate200 }]}>
+              {QUICK_REACTIONS.map((emoji) => (
+                <TouchableOpacity
+                  key={`${item._id}-${emoji}`}
+                  style={styles.reactionPickerEmojiButton}
+                  onPress={() => handleReactToMessage(item._id, emoji)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.reactionPickerEmoji}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={[
+            styles.bubble,
+            isUser ?
+              [styles.userBubble, { backgroundColor: theme.userBubble }] :
+              [styles.friendBubble, { backgroundColor: theme.friendBubble }]
           ]}>
-            {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+            <Text style={[
+              styles.messageText,
+              { color: isUser ? '#FFF' : theme.slate900 }
+            ]}>{item.content}</Text>
+            <Text style={[
+              styles.messageTime,
+              { color: isUser ? 'rgba(255,255,255,0.7)' : theme.slate500 }
+            ]}>
+              {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+
+          {renderReactions(item.reactions)}
         </View>
       </View>
+      </TouchableOpacity>
     );
   };
 
@@ -237,10 +344,11 @@ export default function ChatRoomScreen() {
               onChangeText={(text) => {
                 setInputText(text);
               }}
+              onFocus={() => setShowEmojiPicker(false)}
               multiline
             />
 
-            <TouchableOpacity style={styles.inputIconButton}>
+            <TouchableOpacity style={styles.inputIconButton} onPress={handleToggleEmojiPicker}>
               <Ionicons name="happy-outline" size={22} color={theme.slate400} />
             </TouchableOpacity>
 
@@ -252,6 +360,13 @@ export default function ChatRoomScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <EmojiPicker
+          onEmojiSelected={handlePickEmoji}
+          open={showEmojiPicker}
+          onClose={() => setShowEmojiPicker(false)}
+          categoryPosition="top"
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -334,6 +449,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignItems: 'flex-end',
   },
+  messageContentWrap: {
+    maxWidth: '86%',
+  },
   userMessageRow: {
     justifyContent: 'flex-end',
   },
@@ -351,7 +469,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    maxWidth: '86%',
+    maxWidth: '100%',
   },
   userBubble: {
     borderBottomRightRadius: 4,
@@ -367,6 +485,47 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
     textAlign: 'right',
+  },
+  reactionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  reactionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  reactionEmoji: {
+    fontSize: 13,
+  },
+  reactionCount: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  reactionPickerRow: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+    gap: 6,
+  },
+  reactionPickerEmojiButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reactionPickerEmoji: {
+    fontSize: 18,
   },
   inputContainer: {
     paddingHorizontal: 16,
