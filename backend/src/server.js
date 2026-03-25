@@ -174,6 +174,16 @@ io.on("connection", (socket) => {
         });
     });
 
+    socket.on("message reaction", (updatedMessage) => {
+        const chat = updatedMessage?.chat;
+        if (!chat?.participants) return;
+
+        chat.participants.forEach((user) => {
+            if (String(user._id) === String(socket.data.userId)) return;
+            socket.in(user._id).emit("message reaction received", updatedMessage);
+        });
+    });
+
     socket.on("disconnect", (reason) => {
         const disconnectedUserId = socket.data.userId;
         if (disconnectedUserId) {

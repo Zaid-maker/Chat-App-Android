@@ -24,7 +24,19 @@ const messageSchema = new mongoose.Schema({
         type: String,
         enum: ["sent", "delivered", "read"],
         default: "sent"
-    }
+    },
+    reactions: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+        },
+        emoji: {
+            type: String,
+            required: true,
+            trim: true,
+        }
+    }]
 }, { timestamps: true });
 
 const Message = mongoose.model("Message", messageSchema);
