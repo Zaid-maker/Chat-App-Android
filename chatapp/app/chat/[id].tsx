@@ -35,6 +35,15 @@ export default function ChatRoomScreen() {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
 
+  const getParticipantIds = useCallback(() => {
+    if (!chatInfo || !currentUser) return [];
+    return (
+      chatInfo.participants
+        ?.map((p: any) => p._id)
+        .filter((pid: string) => pid !== currentUser._id) || []
+    );
+  }, [chatInfo, currentUser]);
+
   useEffect(() => {
     const setup = async () => {
       const userData = await storage.getItem('userData');
@@ -55,6 +64,13 @@ export default function ChatRoomScreen() {
 
         newSocket.on('message received', (newMessage) => {
           if (String(newMessage?.chat?._id) === String(id)) {
+            if (newMessage?._id && newMessage?.sender?._id) {
+              newSocket.emit('message delivered', {
+                messageId: newMessage._id,
+                senderId: newMessage.sender._id,
+              });
+            }
+
             setMessages((prev) => {
               if (!newMessage?._id) return prev;
               if (prev.some((message) => message?._id === newMessage._id)) {
@@ -74,6 +90,32 @@ export default function ChatRoomScreen() {
                 ? { ...message, reactions: updatedMessage.reactions || [] }
                 : message
             )
+          );
+        });
+
+        newSocket.on('message status updated', ({ messageId, status }) => {
+          if (!messageId || !status) return;
+          setMessages((prev) =>
+            prev.map((message) =>
+              message._id === messageId ? { ...message, status } : message
+            )
+          );
+        });
+
+        newSocket.on('messages status updated', ({ updates }) => {
+          if (!Array.isArray(updates) || updates.length === 0) return;
+
+          const statusByMessageId = updates.reduce((acc: Record<string, string>, update: any) => {
+            if (!update?.messageId || !update?.status) return acc;
+            acc[update.messageId] = update.status;
+            return acc;
+          }, {});
+
+          setMessages((prev) =>
+            prev.map((message) => {
+              const status = statusByMessageId[message._id];
+              return status ? { ...message, status } : message;
+            })
           );
         });
 
@@ -116,6 +158,10 @@ export default function ChatRoomScreen() {
     setup();
 
     return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
       setSocket((prevSocket: any) => {
         prevSocket?.disconnect();
         return null;
@@ -136,9 +182,7 @@ export default function ChatRoomScreen() {
 
     if (!socket || !chatInfo || !currentUser) return;
 
-    const participantIds = chatInfo.participants
-      ?.map((p: any) => p._id)
-      .filter((pid: string) => pid !== currentUser._id) || [];
+    const participantIds = getParticipantIds();
 
     if (text.trim() && !isTypingRef.current) {
       // Start typing
@@ -165,6 +209,36 @@ export default function ChatRoomScreen() {
     }, 2000); // Stop typing after 2 seconds of no activity
   };
 
+  useEffect(() => {
+    if (!socket || !currentUser || !messages.length) return;
+
+    const unreadIncomingIds = messages
+      .filter(
+        (message) =>
+          message?.sender?._id !== currentUser._id &&
+          message?.status !== 'read' &&
+          message?._id
+      )
+      .map((message) => message._id);
+
+    if (unreadIncomingIds.length === 0) return;
+
+    const participantIds = getParticipantIds();
+    socket.emit('messages read', {
+      messageIds: unreadIncomingIds,
+      chatParticipants: participantIds,
+    });
+
+    // Keep local UI responsive while socket round-trip completes.
+    setMessages((prev) =>
+      prev.map((message) =>
+        unreadIncomingIds.includes(message._id)
+          ? { ...message, status: 'read' }
+          : message
+      )
+    );
+  }, [messages, socket, currentUser, getParticipantIds]);
+
   const handleSend = async () => {
     if (inputText.trim()) {
       const content = inputText.trim();
@@ -180,9 +254,7 @@ export default function ChatRoomScreen() {
 
       // Emit stopped typing
       if (socket && chatInfo && currentUser) {
-        const participantIds = chatInfo.participants
-          ?.map((p: any) => p._id)
-          .filter((pid: string) => pid !== currentUser._id) || [];
+        const participantIds = getParticipantIds();
 
         socket.emit('user stopped typing', {
           chatId: id,
@@ -276,6 +348,8 @@ export default function ChatRoomScreen() {
   const renderMessage = ({ item }: { item: any }) => {
     const isUser = item.sender._id === currentUser?._id;
     const showReactionPicker = reactionPickerForMessageId === item._id;
+    const isDelivered = item.status === 'delivered' || item.status === 'read';
+    const isRead = item.status === 'read';
 
     return (
       <TouchableOpacity
@@ -324,6 +398,14 @@ export default function ChatRoomScreen() {
             ]}>
               {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
+            {isUser ? (
+              <Ionicons
+                name={isDelivered ? 'checkmark-done' : 'checkmark'}
+                size={12}
+                color={isRead ? '#93c5fd' : 'rgba(255,255,255,0.7)'}
+                style={styles.statusIcon}
+              />
+            ) : null}
           </View>
 
           {renderReactions(item.reactions)}
@@ -575,6 +657,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
     textAlign: 'right',
+  },
+  statusIcon: {
+    marginTop: 2,
+    alignSelf: 'flex-end',
   },
   reactionsRow: {
     flexDirection: 'row',

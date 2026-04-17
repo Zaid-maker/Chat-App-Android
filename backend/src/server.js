@@ -10,6 +10,7 @@ import chatRoutes from "./routes/chat.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import callRoutes from "./routes/call.routes.js";
 import User from "./models/user.model.js";
+import Message from "./models/message.model.js";
 
 dotenv.config();
 
@@ -172,6 +173,89 @@ io.on("connection", (socket) => {
             if (user._id == message.sender._id) return;
             socket.in(user._id).emit("message received", message);
         });
+    });
+
+    socket.on("message delivered", async ({ messageId, senderId }) => {
+        if (!messageId || !senderId) return;
+
+        try {
+            const updatedMessage = await Message.findOneAndUpdate(
+                {
+                    _id: messageId,
+                    sender: senderId,
+                    status: "sent",
+                },
+                { status: "delivered" },
+                { new: true }
+            ).select("_id status");
+
+            if (!updatedMessage) return;
+
+            io.to(String(senderId)).emit("message status updated", {
+                messageId: String(updatedMessage._id),
+                status: updatedMessage.status,
+            });
+        } catch (error) {
+            console.error("❌ SOCKET: Failed to mark message delivered:", error.message);
+        }
+    });
+
+    socket.on("messages read", async ({ messageIds, chatParticipants }) => {
+        if (!Array.isArray(messageIds) || messageIds.length === 0) return;
+
+        try {
+            const messages = await Message.find({
+                _id: { $in: messageIds },
+                sender: { $ne: socket.data.userId },
+                status: { $ne: "read" },
+            }).select("_id sender status");
+
+            if (!messages.length) return;
+
+            const updates = await Promise.all(
+                messages.map((message) =>
+                    Message.findByIdAndUpdate(
+                        message._id,
+                        { status: "read" },
+                        { new: true }
+                    ).select("_id sender status")
+                )
+            );
+
+            const readUpdates = updates.filter(Boolean);
+            if (!readUpdates.length) return;
+
+            const updatesBySender = new Map();
+            readUpdates.forEach((message) => {
+                const senderKey = String(message.sender);
+                if (!updatesBySender.has(senderKey)) {
+                    updatesBySender.set(senderKey, []);
+                }
+                updatesBySender.get(senderKey).push({
+                    messageId: String(message._id),
+                    status: message.status,
+                });
+            });
+
+            updatesBySender.forEach((senderUpdates, senderId) => {
+                io.to(senderId).emit("messages status updated", {
+                    chatId: null,
+                    updates: senderUpdates,
+                });
+            });
+
+            // Optional mirror to participants in the open chat to keep all clients in sync.
+            if (Array.isArray(chatParticipants)) {
+                chatParticipants.forEach((participantId) => {
+                    if (String(participantId) === String(socket.data.userId)) return;
+                    socket.in(participantId).emit("messages read received", {
+                        messageIds: readUpdates.map((message) => String(message._id)),
+                    });
+                });
+            }
+        } catch (error) {
+            console.error("❌ SOCKET: Failed to mark messages as read:", error.message);
+        }
     });
 
     socket.on("message reaction", (updatedMessage) => {
