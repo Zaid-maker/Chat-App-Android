@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import api from '@/constants/api';
 import storage from '@/constants/storage';
+import { useAppUpdate } from '@/hooks/use-app-update';
 
 type CurrentUser = {
   _id: string;
@@ -31,6 +32,20 @@ export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const {
+    checking,
+    downloading,
+    available,
+    currentVersion,
+    currentBuildNumber,
+    latestVersion,
+    latestBuildNumber,
+    releaseName,
+    notes,
+    error,
+    checkForUpdate,
+    installUpdate,
+  } = useAppUpdate();
 
   const loadCurrentUser = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -75,7 +90,8 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadCurrentUser(false);
-    }, [loadCurrentUser])
+      checkForUpdate();
+    }, [loadCurrentUser, checkForUpdate])
   );
 
   const handleRefresh = () => {
@@ -266,6 +282,65 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* App Update */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.slate400 }]}>APP UPDATE</Text>
+          <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.slate200 }]}> 
+            <View style={styles.updateRow}>
+              <View style={[styles.iconBox, { backgroundColor: '#2563eb1A' }]}> 
+                <Ionicons name="cloud-download" size={20} color="#2563eb" />
+              </View>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, { color: theme.slate900 }]}>App Version</Text>
+                <Text style={[styles.settingSublabel, { color: theme.slate500 }]}>Current: {currentVersion} (Build {currentBuildNumber})</Text>
+                {available ? (
+                  <Text style={[styles.updateNotice, { color: '#2563eb' }]}>Update available: {latestVersion} (Build {latestBuildNumber})</Text>
+                ) : (
+                  <Text style={[styles.settingSublabel, { color: theme.slate500 }]}>You're on the latest release.</Text>
+                )}
+              </View>
+            </View>
+
+            {releaseName ? <Text style={[styles.updateReleaseName, { color: theme.slate500 }]}>{releaseName}</Text> : null}
+
+            {notes ? (
+              <Text style={[styles.updateNotes, { color: theme.slate500 }]} numberOfLines={3}>
+                {notes}
+              </Text>
+            ) : null}
+
+            {error ? <Text style={[styles.updateError, { color: '#ef4444' }]}>{error}</Text> : null}
+
+            <View style={styles.updateActions}>
+              <TouchableOpacity
+                style={[styles.updateButton, { borderColor: theme.slate200 }]}
+                onPress={checkForUpdate}
+                disabled={checking || downloading}
+              >
+                {checking ? (
+                  <ActivityIndicator size="small" color={theme.brandPrimary} />
+                ) : (
+                  <Text style={[styles.updateButtonText, { color: theme.slate900 }]}>Check again</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.updateButton, { backgroundColor: theme.brandPrimary }]}
+                onPress={installUpdate}
+                disabled={!available || downloading}
+              >
+                {downloading ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={[styles.updateButtonText, { color: '#FFF' }]}>
+                    {available ? 'Install update' : 'Up to date'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
         {/* Action Section */}
         <View style={styles.actionSection}>
           <TouchableOpacity
@@ -275,7 +350,7 @@ export default function SettingsScreen() {
             <Ionicons name="log-out" size={20} color="#ef4444" />
             <Text style={styles.logoutText}>Log Out</Text>
           </TouchableOpacity>
-          <Text style={[styles.versionText, { color: theme.slate400 }]}>Version 4.12.0 (Build 223)</Text>
+          <Text style={[styles.versionText, { color: theme.slate400 }]}>Version {currentVersion} (Build {currentBuildNumber})</Text>
         </View>
       </ScrollView>
 
@@ -437,6 +512,55 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     flex: 1,
+  },
+  updateRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  updateNotice: {
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  updateReleaseName: {
+    paddingHorizontal: 16,
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  updateNotes: {
+    paddingHorizontal: 16,
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  updateError: {
+    paddingHorizontal: 16,
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  updateActions: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
+  },
+  updateButton: {
+    flex: 1,
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  updateButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   settingSublabel: {
     fontSize: 13,

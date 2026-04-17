@@ -51,6 +51,10 @@
       "router": {},
       "eas": {
         "projectId": "584fb052-b158-4dac-ac99-ed37d5a35430"
+      },
+      "update": {
+        "githubOwner": "Zaid-maker",
+        "githubRepo": "Chat-App-Android"
       }
     },
     "owner": "devmirza"
