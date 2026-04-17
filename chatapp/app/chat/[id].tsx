@@ -34,6 +34,9 @@ export default function ChatRoomScreen() {
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
+  const socketRef = useRef<any>(null);
+  const currentUserRef = useRef<any>(null);
+  const chatInfoRef = useRef<any>(null);
 
   const getParticipantIds = useCallback(() => {
     if (!chatInfo || !currentUser) return [];
@@ -45,6 +48,14 @@ export default function ChatRoomScreen() {
   }, [chatInfo, currentUser]);
 
   useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  useEffect(() => {
+    chatInfoRef.current = chatInfo;
+  }, [chatInfo]);
+
+  useEffect(() => {
     const setup = async () => {
       const userData = await storage.getItem('userData');
       if (userData) {
@@ -54,6 +65,7 @@ export default function ChatRoomScreen() {
         // Socket.io setup: join user room so server can deliver direct message events.
         console.log('🔌 SOCKET: Attempting to connect to:', SOCKET_URL);
         const newSocket = io(SOCKET_URL);
+        socketRef.current = newSocket;
         setSocket(newSocket);
 
         newSocket.on('connect', () => {
@@ -162,10 +174,32 @@ export default function ChatRoomScreen() {
         clearTimeout(typingTimeoutRef.current);
       }
 
+      const cleanupSocket = socketRef.current;
+      const cleanupCurrentUser = currentUserRef.current;
+      const cleanupChatInfo = chatInfoRef.current;
+
+      if (isTypingRef.current && cleanupSocket && cleanupCurrentUser && cleanupChatInfo) {
+        const participantIds =
+          cleanupChatInfo.participants
+            ?.map((p: any) => p._id)
+            .filter((pid: string) => pid !== cleanupCurrentUser._id) || [];
+
+        if (participantIds.length > 0) {
+          cleanupSocket.emit('user stopped typing', {
+            chatId: id,
+            chatParticipants: participantIds,
+          });
+        }
+      }
+
+      isTypingRef.current = false;
+
       setSocket((prevSocket: any) => {
         prevSocket?.disconnect();
         return null;
       });
+
+      socketRef.current = null;
     };
   }, [id]);
 

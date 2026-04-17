@@ -176,13 +176,21 @@ io.on("connection", (socket) => {
     });
 
     socket.on("message delivered", async ({ messageId, senderId }) => {
-        if (!messageId || !senderId) return;
+        if (!messageId) return;
 
         try {
+            const message = await Message.findById(messageId).select("_id sender chat status");
+            if (!message) return;
+
+            const chat = await Chat.findById(message.chat).select("participants");
+            if (!chat?.participants?.some((participant) => String(participant) === String(socket.data.userId))) {
+                return;
+            }
+
             const updatedMessage = await Message.findOneAndUpdate(
                 {
-                    _id: messageId,
-                    sender: senderId,
+                    _id: message._id,
+                    sender: message.sender,
                     status: "sent",
                 },
                 { status: "delivered" },
@@ -191,7 +199,7 @@ io.on("connection", (socket) => {
 
             if (!updatedMessage) return;
 
-            io.to(String(senderId)).emit("message status updated", {
+            io.to(String(message.sender)).emit("message status updated", {
                 messageId: String(updatedMessage._id),
                 status: updatedMessage.status,
             });
@@ -208,22 +216,33 @@ io.on("connection", (socket) => {
                 _id: { $in: messageIds },
                 sender: { $ne: socket.data.userId },
                 status: { $ne: "read" },
-            }).select("_id sender status");
+            }).select("_id sender chat status");
 
             if (!messages.length) return;
 
-            const updates = await Promise.all(
-                messages.map((message) =>
-                    Message.findByIdAndUpdate(
-                        message._id,
-                        { status: "read" },
-                        { new: true }
-                    ).select("_id sender status")
-                )
+            const chatIds = [...new Set(messages.map((message) => String(message.chat)))];
+            const chats = await Chat.find({ _id: { $in: chatIds } }).select("participants");
+            const chatsById = new Map(chats.map((chat) => [String(chat._id), chat]));
+
+            const readableMessages = messages.filter((message) => {
+                const chat = chatsById.get(String(message.chat));
+                return chat?.participants?.some(
+                    (participant) => String(participant) === String(socket.data.userId)
+                );
+            });
+
+            if (!readableMessages.length) return;
+
+            await Message.updateMany(
+                {
+                    _id: { $in: readableMessages.map((message) => message._id) },
+                    sender: { $ne: socket.data.userId },
+                    status: { $ne: "read" },
+                },
+                { $set: { status: "read" } }
             );
 
-            const readUpdates = updates.filter(Boolean);
-            if (!readUpdates.length) return;
+            const readUpdates = readableMessages;
 
             const updatesBySender = new Map();
             readUpdates.forEach((message) => {
@@ -239,17 +258,33 @@ io.on("connection", (socket) => {
 
             updatesBySender.forEach((senderUpdates, senderId) => {
                 io.to(senderId).emit("messages status updated", {
-                    chatId: null,
                     updates: senderUpdates,
                 });
             });
 
-            // Optional mirror to participants in the open chat to keep all clients in sync.
             if (Array.isArray(chatParticipants)) {
+                const chatIdsByParticipant = new Map();
+                readUpdates.forEach((message) => {
+                    const participantChat = chatsById.get(String(message.chat));
+                    if (!participantChat) return;
+                    participantChat.participants.forEach((participantId) => {
+                        const key = String(participantId);
+                        if (!chatIdsByParticipant.has(key)) {
+                            chatIdsByParticipant.set(key, []);
+                        }
+                        chatIdsByParticipant.get(key).push({
+                            messageId: String(message._id),
+                            status: "read",
+                        });
+                    });
+                });
+
                 chatParticipants.forEach((participantId) => {
                     if (String(participantId) === String(socket.data.userId)) return;
-                    socket.in(participantId).emit("messages read received", {
-                        messageIds: readUpdates.map((message) => String(message._id)),
+                    const updates = chatIdsByParticipant.get(String(participantId));
+                    if (!updates?.length) return;
+                    socket.in(participantId).emit("messages status updated", {
+                        updates,
                     });
                 });
             }
@@ -269,7 +304,13 @@ io.on("connection", (socket) => {
     });
 
     socket.on("user typing", ({ chatId, chatParticipants, userName }) => {
-        if (!chatId || !chatParticipants || chatParticipants.length === 0) return;
+        if (!chatId || !Array.isArray(chatParticipants) || chatParticipants.length === 0) return;
+
+        socket.data.typingChats = socket.data.typingChats || new Map();
+        socket.data.typingChats.set(String(chatId), {
+            participants: chatParticipants,
+            userName,
+        });
 
         console.log(`⌨️  SOCKET: ${userName} is typing in chat ${chatId}`);
         
@@ -284,7 +325,11 @@ io.on("connection", (socket) => {
     });
 
     socket.on("user stopped typing", ({ chatId, chatParticipants }) => {
-        if (!chatId || !chatParticipants || chatParticipants.length === 0) return;
+        if (!chatId || !Array.isArray(chatParticipants) || chatParticipants.length === 0) return;
+
+        if (socket.data.typingChats) {
+            socket.data.typingChats.delete(String(chatId));
+        }
 
         console.log(`✋ SOCKET: User ${socket.data.userId} stopped typing in chat ${chatId}`);
         
@@ -299,6 +344,21 @@ io.on("connection", (socket) => {
 
     socket.on("disconnect", (reason) => {
         const disconnectedUserId = socket.data.userId;
+        if (socket.data.typingChats instanceof Map) {
+            socket.data.typingChats.forEach(({ participants }, chatId) => {
+                if (!Array.isArray(participants)) return;
+
+                participants.forEach((participantId) => {
+                    if (String(participantId) === String(disconnectedUserId)) return;
+                    socket.in(participantId).emit("user stopped typing received", {
+                        chatId,
+                        userId: disconnectedUserId,
+                    });
+                });
+            });
+            socket.data.typingChats.clear();
+        }
+
         if (disconnectedUserId) {
             const currentCount = activeSocketsByUserId.get(disconnectedUserId) || 0;
             const nextCount = Math.max(0, currentCount - 1);
