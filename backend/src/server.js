@@ -184,6 +184,35 @@ io.on("connection", (socket) => {
         });
     });
 
+    socket.on("user typing", ({ chatId, chatParticipants, userName }) => {
+        if (!chatId || !chatParticipants || chatParticipants.length === 0) return;
+
+        console.log(`⌨️  SOCKET: ${userName} is typing in chat ${chatId}`);
+        
+        chatParticipants.forEach((participantId) => {
+            if (String(participantId) === String(socket.data.userId)) return;
+            socket.in(participantId).emit("user typing received", {
+                chatId,
+                userId: socket.data.userId,
+                userName,
+            });
+        });
+    });
+
+    socket.on("user stopped typing", ({ chatId, chatParticipants }) => {
+        if (!chatId || !chatParticipants || chatParticipants.length === 0) return;
+
+        console.log(`✋ SOCKET: User ${socket.data.userId} stopped typing in chat ${chatId}`);
+        
+        chatParticipants.forEach((participantId) => {
+            if (String(participantId) === String(socket.data.userId)) return;
+            socket.in(participantId).emit("user stopped typing received", {
+                chatId,
+                userId: socket.data.userId,
+            });
+        });
+    });
+
     socket.on("disconnect", (reason) => {
         const disconnectedUserId = socket.data.userId;
         if (disconnectedUserId) {
