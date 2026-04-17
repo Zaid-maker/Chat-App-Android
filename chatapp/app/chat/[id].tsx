@@ -29,8 +29,31 @@ export default function ChatRoomScreen() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [chatInfo, setChatInfo] = useState<any>(null);
   const [socket, setSocket] = useState<any>(null);
+  const [usersTyping, setUsersTyping] = useState<Record<string, string>>({}); // userId -> userName
 
   const flatListRef = useRef<FlatList>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
+  const socketRef = useRef<any>(null);
+  const currentUserRef = useRef<any>(null);
+  const chatInfoRef = useRef<any>(null);
+
+  const getParticipantIds = useCallback(() => {
+    if (!chatInfo || !currentUser) return [];
+    return (
+      chatInfo.participants
+        ?.map((p: any) => p._id)
+        .filter((pid: string) => pid !== currentUser._id) || []
+    );
+  }, [chatInfo, currentUser]);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  useEffect(() => {
+    chatInfoRef.current = chatInfo;
+  }, [chatInfo]);
 
   useEffect(() => {
     const setup = async () => {
@@ -42,6 +65,7 @@ export default function ChatRoomScreen() {
         // Socket.io setup: join user room so server can deliver direct message events.
         console.log('🔌 SOCKET: Attempting to connect to:', SOCKET_URL);
         const newSocket = io(SOCKET_URL);
+        socketRef.current = newSocket;
         setSocket(newSocket);
 
         newSocket.on('connect', () => {
@@ -52,6 +76,13 @@ export default function ChatRoomScreen() {
 
         newSocket.on('message received', (newMessage) => {
           if (String(newMessage?.chat?._id) === String(id)) {
+            if (newMessage?._id && newMessage?.sender?._id) {
+              newSocket.emit('message delivered', {
+                messageId: newMessage._id,
+                senderId: newMessage.sender._id,
+              });
+            }
+
             setMessages((prev) => {
               if (!newMessage?._id) return prev;
               if (prev.some((message) => message?._id === newMessage._id)) {
@@ -74,17 +105,63 @@ export default function ChatRoomScreen() {
           );
         });
 
+        newSocket.on('message status updated', ({ messageId, status }) => {
+          if (!messageId || !status) return;
+          setMessages((prev) =>
+            prev.map((message) =>
+              message._id === messageId ? { ...message, status } : message
+            )
+          );
+        });
+
+        newSocket.on('messages status updated', ({ updates }) => {
+          if (!Array.isArray(updates) || updates.length === 0) return;
+
+          const statusByMessageId = updates.reduce((acc: Record<string, string>, update: any) => {
+            if (!update?.messageId || !update?.status) return acc;
+            acc[update.messageId] = update.status;
+            return acc;
+          }, {});
+
+          setMessages((prev) =>
+            prev.map((message) => {
+              const status = statusByMessageId[message._id];
+              return status ? { ...message, status } : message;
+            })
+          );
+        });
+
+        newSocket.on('user typing received', ({ chatId, userId, userName }) => {
+          if (String(chatId) !== String(id)) return;
+          setUsersTyping((prev) => ({
+            ...prev,
+            [userId]: userName,
+          }));
+        });
+
+        newSocket.on('user stopped typing received', ({ chatId, userId }) => {
+          if (String(chatId) !== String(id)) return;
+          setUsersTyping((prev) => {
+            const updated = { ...prev };
+            delete updated[userId];
+            return updated;
+          });
+        });
+
         newSocket.on('connect_error', (error) => {
           console.error('SOCKET connect_error in chat room:', error.message);
         });
       }
 
-      // Fetch messages
+      // Fetch messages and chat info
       try {
-        const response = await api.get(`/chats/messages/${id}`);
-        setMessages(response.data);
+        const messagesResponse = await api.get(`/chats/messages/${id}`);
+        setMessages(messagesResponse.data);
+
+        const chatResponse = await api.get(`/chats/${id}`);
+        setChatInfo(chatResponse.data);
       } catch (err) {
-        console.error('Error fetching messages:', err);
+        console.error('Error fetching messages or chat info:', err);
       } finally {
         setLoading(false);
       }
@@ -93,10 +170,36 @@ export default function ChatRoomScreen() {
     setup();
 
     return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      const cleanupSocket = socketRef.current;
+      const cleanupCurrentUser = currentUserRef.current;
+      const cleanupChatInfo = chatInfoRef.current;
+
+      if (isTypingRef.current && cleanupSocket && cleanupCurrentUser && cleanupChatInfo) {
+        const participantIds =
+          cleanupChatInfo.participants
+            ?.map((p: any) => p._id)
+            .filter((pid: string) => pid !== cleanupCurrentUser._id) || [];
+
+        if (participantIds.length > 0) {
+          cleanupSocket.emit('user stopped typing', {
+            chatId: id,
+            chatParticipants: participantIds,
+          });
+        }
+      }
+
+      isTypingRef.current = false;
+
       setSocket((prevSocket: any) => {
         prevSocket?.disconnect();
         return null;
       });
+
+      socketRef.current = null;
     };
   }, [id]);
 
@@ -108,12 +211,90 @@ export default function ChatRoomScreen() {
     }
   }, [messages]);
 
+  const handleTextChange = (text: string) => {
+    setInputText(text);
+
+    if (!socket || !chatInfo || !currentUser) return;
+
+    const participantIds = getParticipantIds();
+
+    if (text.trim() && !isTypingRef.current) {
+      // Start typing
+      isTypingRef.current = true;
+      socket.emit('user typing', {
+        chatId: id,
+        chatParticipants: participantIds,
+        userName: currentUser.username,
+      });
+    }
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set new timeout to emit stopped typing
+    typingTimeoutRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      socket.emit('user stopped typing', {
+        chatId: id,
+        chatParticipants: participantIds,
+      });
+    }, 2000); // Stop typing after 2 seconds of no activity
+  };
+
+  useEffect(() => {
+    if (!socket || !currentUser || !messages.length) return;
+
+    const unreadIncomingIds = messages
+      .filter(
+        (message) =>
+          message?.sender?._id !== currentUser._id &&
+          message?.status !== 'read' &&
+          message?._id
+      )
+      .map((message) => message._id);
+
+    if (unreadIncomingIds.length === 0) return;
+
+    const participantIds = getParticipantIds();
+    socket.emit('messages read', {
+      messageIds: unreadIncomingIds,
+      chatParticipants: participantIds,
+    });
+
+    // Keep local UI responsive while socket round-trip completes.
+    setMessages((prev) =>
+      prev.map((message) =>
+        unreadIncomingIds.includes(message._id)
+          ? { ...message, status: 'read' }
+          : message
+      )
+    );
+  }, [messages, socket, currentUser, getParticipantIds]);
+
   const handleSend = async () => {
     if (inputText.trim()) {
       const content = inputText.trim();
       setInputText('');
       setShowEmojiPicker(false);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      // Clear typing state
+      isTypingRef.current = false;
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Emit stopped typing
+      if (socket && chatInfo && currentUser) {
+        const participantIds = getParticipantIds();
+
+        socket.emit('user stopped typing', {
+          chatId: id,
+          chatParticipants: participantIds,
+        });
+      }
 
       try {
         const response = await api.post('/chats/messages', {
@@ -201,6 +382,8 @@ export default function ChatRoomScreen() {
   const renderMessage = ({ item }: { item: any }) => {
     const isUser = item.sender._id === currentUser?._id;
     const showReactionPicker = reactionPickerForMessageId === item._id;
+    const isDelivered = item.status === 'delivered' || item.status === 'read';
+    const isRead = item.status === 'read';
 
     return (
       <TouchableOpacity
@@ -249,6 +432,14 @@ export default function ChatRoomScreen() {
             ]}>
               {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
+            {isUser ? (
+              <Ionicons
+                name={isDelivered ? 'checkmark-done' : 'checkmark'}
+                size={12}
+                color={isRead ? '#93c5fd' : 'rgba(255,255,255,0.7)'}
+                style={styles.statusIcon}
+              />
+            ) : null}
           </View>
 
           {renderReactions(item.reactions)}
@@ -340,6 +531,13 @@ export default function ChatRoomScreen() {
             paddingBottom: Math.max(insets.bottom, 12)
           }
         ]}>
+          {Object.keys(usersTyping).length > 0 && (
+            <View style={[styles.typingIndicator, { borderTopColor: theme.slate200 }]}>
+              <Text style={[styles.typingText, { color: theme.slate500 }]}>
+                {Object.values(usersTyping).join(', ')} {Object.keys(usersTyping).length === 1 ? 'is' : 'are'} typing...
+              </Text>
+            </View>
+          )}
           <View style={[styles.inputPill, { backgroundColor: theme.slate200 + '33', borderColor: theme.slate200 }]}>
             <TouchableOpacity style={styles.inputIconButton}>
               <Ionicons name="add" size={24} color={theme.slate400} />
@@ -350,9 +548,7 @@ export default function ChatRoomScreen() {
               placeholder="Type a message..."
               placeholderTextColor={theme.slate400}
               value={inputText}
-              onChangeText={(text) => {
-                setInputText(text);
-              }}
+              onChangeText={handleTextChange}
               onFocus={() => setShowEmojiPicker(false)}
               multiline
             />
@@ -496,6 +692,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'right',
   },
+  statusIcon: {
+    marginTop: 2,
+    alignSelf: 'flex-end',
+  },
   reactionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -540,6 +740,17 @@ const styles = StyleSheet.create({
   inputContainer: {
     paddingHorizontal: 16,
     paddingTop: 10,
+  },
+  typingIndicator: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    minHeight: 32,
+    justifyContent: 'center',
+  },
+  typingText: {
+    fontSize: 13,
+    fontStyle: 'italic',
   },
   inputPill: {
     flexDirection: 'row',
