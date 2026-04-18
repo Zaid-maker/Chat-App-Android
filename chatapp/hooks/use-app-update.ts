@@ -2,8 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
-import * as FileSystem from 'expo-file-system';
 import { File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 
 type GithubAsset = {
@@ -138,7 +138,7 @@ export function useAppUpdate() {
       setState({
         checking: false,
         downloading: false,
-        available: latestBuildNumber > currentBuildNumber,
+        available: latestBuildNumber > currentBuildNumber && apkUrl.length > 0,
         currentBuildNumber,
         latestBuildNumber,
         currentVersion,

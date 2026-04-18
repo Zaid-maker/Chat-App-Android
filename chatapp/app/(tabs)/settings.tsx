@@ -295,15 +295,15 @@ export default function SettingsScreen() {
                 <Text style={[styles.settingSublabel, { color: theme.slate500 }]}>Current: {currentVersion} (Build {currentBuildNumber})</Text>
                 {available ? (
                   <Text style={[styles.updateNotice, { color: '#2563eb' }]}>Update available: {latestVersion} (Build {latestBuildNumber})</Text>
-                ) : (
+                ) : !error ? (
                   <Text style={[styles.settingSublabel, { color: theme.slate500 }]}>You're on the latest release.</Text>
-                )}
+                ) : null}
               </View>
             </View>
 
-            {releaseName ? <Text style={[styles.updateReleaseName, { color: theme.slate500 }]}>{releaseName}</Text> : null}
+            {releaseName && !error ? <Text style={[styles.updateReleaseName, { color: theme.slate500 }]}>{releaseName}</Text> : null}
 
-            {notes ? (
+            {notes && !error ? (
               <Text style={[styles.updateNotes, { color: theme.slate500 }]} numberOfLines={3}>
                 {notes}
               </Text>
