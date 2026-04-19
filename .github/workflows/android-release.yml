@@ -21,12 +21,12 @@ jobs:
         id: paths
         shell: bash
         run: |
-          if [ -f "chatapp/package.json" ] && [ -f "chatapp/android/gradlew" ]; then
+          if [ -f "chatapp/package.json" ] && [ -d "chatapp/android" ]; then
             echo "app_dir=chatapp" >> "$GITHUB_OUTPUT"
             echo "android_dir=chatapp/android" >> "$GITHUB_OUTPUT"
             echo "metadata_path=chatapp/release-metadata.json" >> "$GITHUB_OUTPUT"
             echo "apk_path=chatapp/android/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_OUTPUT"
-          elif [ -f "package.json" ] && [ -f "android/gradlew" ]; then
+          elif [ -f "package.json" ] && [ -d "android" ]; then
             echo "app_dir=." >> "$GITHUB_OUTPUT"
             echo "android_dir=android" >> "$GITHUB_OUTPUT"
             echo "metadata_path=release-metadata.json" >> "$GITHUB_OUTPUT"
@@ -69,7 +69,14 @@ jobs:
       - name: Build release APK
         shell: bash
         working-directory: ${{ steps.paths.outputs.android_dir }}
-        run: ./gradlew assembleRelease -PVERSION_CODE=${VERSION_CODE} -PVERSION_NAME=${VERSION_NAME}
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            echo "Gradle wrapper not found in $(pwd)" >&2
+            ls -la
+            exit 1
+          fi
+          chmod +x ./gradlew
+          ./gradlew assembleRelease -PVERSION_CODE=${VERSION_CODE} -PVERSION_NAME=${VERSION_NAME}
         env:
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: ${{ steps.version.outputs.version_name }}
