@@ -50,7 +50,7 @@ jobs:
 
       - name: Build release APK
         shell: bash
-        run: ./gradlew assembleRelease -PVERSION_CODE=${VERSION_CODE} -PVERSION_NAME=${VERSION_NAME}
+        run: ./android/gradlew assembleRelease -PVERSION_CODE=${VERSION_CODE} -PVERSION_NAME=${VERSION_NAME}
         env:
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: ${{ steps.version.outputs.version_name }}
