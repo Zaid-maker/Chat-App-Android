@@ -97,8 +97,14 @@ const parseBuildNumber = (value?: string | null) => {
   return match ? Number(match[1]) : 0;
 };
 
+const getInitialUpdateState = (): UpdateState => ({
+  ...EMPTY_STATE,
+  currentBuildNumber: parseBuildNumber(Application.nativeBuildVersion),
+  currentVersion: Application.nativeApplicationVersion || EMPTY_STATE.currentVersion,
+});
+
 export function useAppUpdate() {
-  const [state, setState] = useState<UpdateState>(EMPTY_STATE);
+  const [state, setState] = useState<UpdateState>(getInitialUpdateState());
   const updateConfig = useMemo(() => getUpdateConfig(), []);
   const lastCheckTimeRef = useRef<number>(0);
 
@@ -187,6 +193,9 @@ export function useAppUpdate() {
     try {
       const downloadTarget = new File(Paths.document, UPDATE_APK_NAME).uri;
       const downloadedFile = await FileSystem.downloadAsync(state.apkUrl, downloadTarget);
+      if (downloadedFile.status < 200 || downloadedFile.status >= 300) {
+        throw new Error(`APK download failed with HTTP ${downloadedFile.status}`);
+      }
       const contentUri = await FileSystem.getContentUriAsync(downloadedFile.uri);
 
       await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
