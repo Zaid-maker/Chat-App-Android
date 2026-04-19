@@ -13,10 +13,6 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: chatapp
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,6 +32,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
+        working-directory: chatapp
         run: bun install --frozen-lockfile
 
       - name: Accept Android licenses
@@ -43,6 +40,7 @@ jobs:
 
       - name: Set version name
         id: version
+        working-directory: chatapp
         run: |
           VERSION_NAME=$(node -p "require('./package.json').version")
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
@@ -58,6 +56,7 @@ jobs:
 
       - name: Prepare release metadata
         id: metadata
+        working-directory: chatapp
         run: |
           VERSION_NAME=${{ steps.version.outputs.version_name }}
           BUILD_NUMBER=${{ github.run_number }}
