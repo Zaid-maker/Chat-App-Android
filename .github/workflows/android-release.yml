@@ -21,21 +21,31 @@ jobs:
         id: paths
         shell: bash
         run: |
-          if [ -f "chatapp/package.json" ] && [ -d "chatapp/android" ]; then
-            echo "app_dir=chatapp" >> "$GITHUB_OUTPUT"
-            echo "android_dir=chatapp/android" >> "$GITHUB_OUTPUT"
-            echo "metadata_path=chatapp/release-metadata.json" >> "$GITHUB_OUTPUT"
-            echo "apk_path=chatapp/android/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_OUTPUT"
-          elif [ -f "package.json" ] && [ -d "android" ]; then
-            echo "app_dir=." >> "$GITHUB_OUTPUT"
-            echo "android_dir=android" >> "$GITHUB_OUTPUT"
-            echo "metadata_path=release-metadata.json" >> "$GITHUB_OUTPUT"
-            echo "apk_path=android/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_OUTPUT"
+          echo "Repository root: $(pwd)"
+          ls -la
+
+          if [ -d "chatapp/android" ]; then
+            APP_DIR="chatapp"
+            ANDROID_DIR="chatapp/android"
+            METADATA_PATH="chatapp/release-metadata.json"
+            APK_PATH="chatapp/android/app/build/outputs/apk/release/app-release.apk"
+          elif [ -d "android" ]; then
+            APP_DIR="."
+            ANDROID_DIR="android"
+            METADATA_PATH="release-metadata.json"
+            APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
           else
             echo "Could not find expected project layout." >&2
             ls -la
             exit 1
           fi
+
+          echo "Detected app dir: $APP_DIR"
+          echo "Detected android dir: $ANDROID_DIR"
+          echo "app_dir=$APP_DIR" >> "$GITHUB_OUTPUT"
+          echo "android_dir=$ANDROID_DIR" >> "$GITHUB_OUTPUT"
+          echo "metadata_path=$METADATA_PATH" >> "$GITHUB_OUTPUT"
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
