@@ -17,6 +17,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Detect project paths
+        id: paths
+        shell: bash
+        run: |
+          if [ -f "chatapp/package.json" ] && [ -f "chatapp/android/gradlew" ]; then
+            echo "app_dir=chatapp" >> "$GITHUB_OUTPUT"
+            echo "android_dir=chatapp/android" >> "$GITHUB_OUTPUT"
+            echo "metadata_path=chatapp/release-metadata.json" >> "$GITHUB_OUTPUT"
+            echo "apk_path=chatapp/android/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_OUTPUT"
+          elif [ -f "package.json" ] && [ -f "android/gradlew" ]; then
+            echo "app_dir=." >> "$GITHUB_OUTPUT"
+            echo "android_dir=android" >> "$GITHUB_OUTPUT"
+            echo "metadata_path=release-metadata.json" >> "$GITHUB_OUTPUT"
+            echo "apk_path=android/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_OUTPUT"
+          else
+            echo "Could not find expected project layout." >&2
+            ls -la
+            exit 1
+          fi
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -32,7 +52,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        working-directory: chatapp
+        working-directory: ${{ steps.paths.outputs.app_dir }}
         run: bun install --frozen-lockfile
 
       - name: Accept Android licenses
@@ -40,7 +60,7 @@ jobs:
 
       - name: Set version name
         id: version
-        working-directory: chatapp
+        working-directory: ${{ steps.paths.outputs.app_dir }}
         run: |
           VERSION_NAME=$(node -p "require('./package.json').version")
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
@@ -48,7 +68,7 @@ jobs:
 
       - name: Build release APK
         shell: bash
-        working-directory: chatapp/android
+        working-directory: ${{ steps.paths.outputs.android_dir }}
         run: ./gradlew assembleRelease -PVERSION_CODE=${VERSION_CODE} -PVERSION_NAME=${VERSION_NAME}
         env:
           VERSION_CODE: ${{ github.run_number }}
@@ -56,7 +76,7 @@ jobs:
 
       - name: Prepare release metadata
         id: metadata
-        working-directory: chatapp
+        working-directory: ${{ steps.paths.outputs.app_dir }}
         run: |
           VERSION_NAME=${{ steps.version.outputs.version_name }}
           BUILD_NUMBER=${{ github.run_number }}
@@ -69,6 +89,6 @@ jobs:
         with:
           tag_name: ${{ steps.metadata.outputs.tag_name }}
           name: Android build ${{ github.run_number }}
-          body_path: chatapp/release-metadata.json
+          body_path: ${{ steps.paths.outputs.metadata_path }}
           files: |
-            chatapp/android/app/build/outputs/apk/release/app-release.apk
+            ${{ steps.paths.outputs.apk_path }}
