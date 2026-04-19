@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
@@ -63,6 +63,9 @@ const EMPTY_STATE: UpdateState = {
 
 const UPDATE_APK_NAME = 'chatapp-update.apk';
 
+// Throttle API calls to 1 check per 5 minutes to avoid GitHub rate limits (60/hour)
+const THROTTLE_DURATION_MS = 5 * 60 * 1000;
+
 const getUpdateConfig = (): UpdateConfig => {
   const extra = Constants.expoConfig?.extra as { update?: UpdateConfig } | undefined;
   return extra?.update || {};
@@ -97,8 +100,17 @@ const parseBuildNumber = (value?: string | null) => {
 export function useAppUpdate() {
   const [state, setState] = useState<UpdateState>(EMPTY_STATE);
   const updateConfig = useMemo(() => getUpdateConfig(), []);
+  const lastCheckTimeRef = useRef<number>(0);
 
-  const checkForUpdate = useCallback(async () => {
+  const checkForUpdate = useCallback(async (force = false) => {
+    const now = Date.now();
+    const timeSinceLastCheck = now - lastCheckTimeRef.current;
+
+    // Skip check if throttled (less than THROTTLE_DURATION_MS since last check), unless forced
+    if (!force && timeSinceLastCheck < THROTTLE_DURATION_MS) {
+      return;
+    }
+
     if (!updateConfig.githubOwner || !updateConfig.githubRepo) {
       setState((prev) => ({
         ...prev,
@@ -109,6 +121,7 @@ export function useAppUpdate() {
     }
 
     setState((prev) => ({ ...prev, checking: true, error: null }));
+    lastCheckTimeRef.current = now;
 
     try {
       const response = await fetch(

@@ -314,7 +314,7 @@ export default function SettingsScreen() {
             <View style={styles.updateActions}>
               <TouchableOpacity
                 style={[styles.updateButton, { borderColor: theme.slate200 }]}
-                onPress={checkForUpdate}
+                onPress={() => checkForUpdate(true)}
                 disabled={checking || downloading}
               >
                 {checking ? (
