@@ -178,6 +178,10 @@ export function useAppUpdate() {
   }, [updateConfig.githubOwner, updateConfig.githubRepo]);
 
   const installUpdate = useCallback(async () => {
+    // re-entry guard to prevent multiple simultaneous downloads
+    if (state.downloading) {
+      return;
+    }
     if (!state.apkUrl) {
       Alert.alert('Update unavailable', 'No APK asset was attached to the latest release.');
       return;
