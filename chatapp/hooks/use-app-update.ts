@@ -3,7 +3,6 @@ import { Alert, Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 import { File, Paths } from 'expo-file-system';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 
 type GithubAsset = {
@@ -195,16 +194,16 @@ export function useAppUpdate() {
     setState((prev) => ({ ...prev, downloading: true, error: null }));
 
     try {
-      const downloadTarget = new File(Paths.document, UPDATE_APK_NAME).uri;
-      const downloadedFile = await FileSystem.downloadAsync(state.apkUrl, downloadTarget);
-      if (downloadedFile.status < 200 || downloadedFile.status >= 300) {
-        throw new Error(`APK download failed with HTTP ${downloadedFile.status}`);
+      const apkFile = new File(Paths.document, UPDATE_APK_NAME);
+      if (apkFile.exists) {
+        apkFile.delete();
       }
-      const contentUri = await FileSystem.getContentUriAsync(downloadedFile.uri);
+      const downloadedFile = await File.downloadFileAsync(state.apkUrl, apkFile, { idempotent: true });
+      const contentUri = downloadedFile.contentUri;
 
       await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
         data: contentUri,
-        flags: 1,
+        flags: 1 | 268435456, // FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK
         type: 'application/vnd.android.package-archive',
       });
     } catch (error: any) {
